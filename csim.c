@@ -3,6 +3,7 @@
  *
  * Name:   [Student Name]
  * Andrew: [Student ID / Email]
+ * ./csim[-V] -s<num> -E<num> -b<num> -t<trace_file>
  */
 
 #include <getopt.h>
@@ -24,7 +25,7 @@ typedef struct {
 
 /* Structural definition of a cache set */
 typedef struct {
-    cache_line_t *lines;
+    cache_line_t *lines; // Array of lines
     int next_evict; // Points to the next line to evict under FIFO
 } cache_set_t;
 
@@ -171,7 +172,7 @@ void free_cache(cache_t cache) {
  *
  *  2. Search target set lines for a HIT (valid == 1 AND line.tag == tag).
  *     - If HIT: Increment hit_count, if (verbose) printf("hit "); and return.
- *
+ * 
  *  3. Handle MISS (empty line available, valid == 0):
  *     - Increment miss_count.
  *     - Populate line (valid = 1, tag = tag).
@@ -188,22 +189,54 @@ void access_cache(cache_t cache, uint32_t address, int verbose) {
     /* [STUDENT TODO: Implement 32-bit bitwise parsing & FIFO state machine] */
 
     /* 1. Extract set index and tag using 32-bit bitwise operations */
+    uint32_t set_index = (address >> cache.b) & ((1U << cache.s) - 1);
+    uint32_t tag = address >> (cache.s + cache.b);
 
     /* 2. Check for Cache HIT                                         */
     /*    Include the following code when a hit is encountered:       */
     /*       hit_count++;                                             */
     /*       if (verbose) printf("hit ");                             */
+    for (int i = 0; i < cache.E; i++) {
+        if ((cache.sets[set_index].lines[i].valid == 1) && (cache.sets[set_index].lines[i].tag == tag)) {
+            hit_count++;
+            if (verbose) printf("hit ");
+            return;
+        }
+    }
 
     /* 3. Cache MISS = Search for empty / invalid line                */
     /*    Include the following code when a miss is encountered:      */
     /*       miss_count++;                                            */
     /*       if (verbose) printf("miss ");                            */
+    /*
+    if not, miss
+    for (i:0 to<cache.E) 
+        check cache.sets[set_index].lines for empty set
+        if empty, set valid and tag, then return
+    */
+    if(verbose) printf("miss ");
+    miss_count++;
+    for (int i = 0; i < cache.E; i++) {
+        if (!cache.sets[set_index].lines[i].valid) {
+            cache.sets[set_index].lines[i].valid = 1;
+            cache.sets[set_index].lines[i].tag = tag;
+            return;
+        }
+    }
 
     /* 4. Cache MISS + EVICTION - FIFO replacement policy             */
     /*    Include the following code when an eviction is encountered: */
     /*       eviction_count++;                                        */
     /*       if (verbose) printf("eviction ");                        */
-
+    /* 
+    -if not empty
+        evict based on cache.sets[set_index].next_evict
+        increment next_evict (mod cache.E)
+    */
+    if (verbose) printf("eviction ");
+    eviction_count++;
+    cache.sets[set_index].lines[cache.sets[set_index].next_evict].tag = tag;
+    cache.sets[set_index].next_evict = (cache.sets[set_index].next_evict + 1) % cache.E;
 }
 
 void print_usage(char *argv[]) {
